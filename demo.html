@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>新华网实时新闻</title>
+  <link rel="stylesheet" href="/Mu8.github.io/css/style.css">
+"
+  <script src="https://cdn.jsdelivr.net/npm/rss-parser/dist/rss-parser.min.js"></script>
+  <style>
+    .news-item { padding: 8px; border-bottom: 1px solid #eee; }
+    a { color: #0066cc; text-decoration: none; font-size: 14px; }
+    time { font-size: 12px; color: #999; margin-left: 10px; }
+    .loading { text-align: center; padding: 20px; color: #666; }
+    .error { text-align: center; padding: 20px; color: #d00; }
+    .keyword-selector { margin: 10px; }
+    select { padding: 5px; }
+  </style>
+</head>
+<body>
+  <div class="keyword-selector">
+    <label for="category">选择分类:</label>
+    <select id="category" onchange="changeCategory()">
+      <option value="科技">科技</option>
+      <option value="时政">时政</option>
+      <option value="财经">财经</option>
+      <option value="国际">国际</option>
+      <option value="体育">体育</option>
+    </select>
+  </div>
+  
+  <div id="news-list">
+    <div class="loading">新闻加载中...</div>
+  </div>
+
+  <script>
+    // 1. 动态关键词配置
+    const urlParams = new URLSearchParams(window.location.search);
+    let keyword = urlParams.get('keyword') || '科技';
+    const keywordMap = {
+      科技: 'https://www.xinhuanet.com/tech/rss.htm',
+      时政: 'http://www.news.cn/politics/rss.xml',
+      财经: 'http://www.news.cn/finance/rss.xml',
+      国际: 'http://www.news.cn/world/rss.xml',
+      体育: 'http://www.news.cn/sports/rss.xml'
+    };
+    
+    // 设置下拉框选中项
+    document.getElementById('category').value = keyword;
+    let RSS_URL = keywordMap[keyword];
+
+    // 2. 实时刷新配置
+    const REFRESH_INTERVAL = 5 * 60 * 1000; // 5分钟刷新一次
+
+    // 改变分类
+    function changeCategory() {
+      keyword = document.getElementById('category').value;
+      RSS_URL = keywordMap[keyword];
+      renderNews();
+    }
+
+    // 3. 核心渲染函数
+    async function renderNews() {
+      // 显示加载状态
+      document.getElementById('news-list').innerHTML = '<div class="loading">新闻加载中...</div>';
+      
+      const PROXY = `https://corsproxy.io/?${encodeURIComponent(RSS_URL)}`;
+      try {
+        const res = await fetch(PROXY);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const xml = await res.text();
+        const parser = new RSSParser();
+        const feed = await parser.parseString(xml);
+        
+        if (!feed.items || feed.items.length === 0) {
+          document.getElementById('news-list').innerHTML = '<div class="error">暂无新闻数据</div>';
+          return;
+        }
+        
+        let html = '';
+        feed.items.forEach(item => {
+          html += `
+            <div class="news-item">
+              <a href="${item.link}" target="_blank">${item.title}</a>
+              <time>${item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}</time>
+            </div>
+          `;
+        });
+        document.getElementById('news-list').innerHTML = html;
+      } catch (err) {
+        console.error('新闻加载失败:', err);
+        document.getElementById('news-list').innerHTML = `<div class="error">加载失败: ${err.message}</div>`;
+      }
+    }
+
+    // 4. 启动渲染（初始+定时）
+    renderNews();
+    setInterval(renderNews, REFRESH_INTERVAL);
+  </script>
+</body>
+</html>
